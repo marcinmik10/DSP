@@ -71,12 +71,18 @@ grid on;
 
 % Długość filtra FIR - ma wpływ na dokładność i złożoność
 % Dłuższy filtr = lepsze odwzorowanie 1/H(f), ale większe opóźnienie i złożoność
-fir_len = 10; % Przykładowa długość filtra FIR (mniejsza niż dla niskich Fs_adc)
+fir_len = 101; % Przykładowa długość filtra FIR
 
 % !!!!!!! KLUCZOWY PUNKT: Projektowanie filtra 1/H(f) !!!!!!!
 % Bezpośrednie 1./H_f_analog prowadzi do problemów z szumem i niestabilności.
 % Musisz zastosować regularyzację lub bardziej zaawansowane techniki.
 % Poniżej prosty przykład z progowaniem (truncation) lub filtrem Wienera.
+
+% Metoda 1: Proste odwrócenie z progowaniem małych wartości (NIEZALECANE, ale dla ilustracji)
+% H_f_inv = zeros(size(H_f_analog));
+% threshold = max(abs(H_f_analog)) * 0.01; % Próg dla małych wartości
+% valid_freq_idx = abs(H_f_analog) > threshold;
+% H_f_inv(valid_freq_idx) = 1 ./ H_f_analog(valid_freq_idx);
 
 % Metoda 2: Filtr Wienera (bardzo często używana w dekonwolucji)
 % G(f) = H*(f) / (|H(f)|^2 + S_n(f)/S_x(f))
@@ -112,6 +118,7 @@ title('Odpowiedź impulsowa filtru FIR');
 xlabel('Numer próbki');
 ylabel('Wartość');
 grid on;
+
 
 %% 3-5, 7. Główna pętla symulacyjna: Generacja, próbkowanie, szum, rekonstrukcja
 % Będziemy iterować po różnych amplitudach i częstotliwościach próbkowania ADC
@@ -271,25 +278,39 @@ for Fs_idx = 1:length(Fs_adc_range)
         sampled_signal_clean = interp1(t_analog, continuous_signal, t_adc, 'linear', 0);
         sampled_signal_noisy = sampled_signal_clean + noise_amplitude_rms * randn(size(sampled_signal_clean));
         
-        % Zaprojektuj nowy filtr Wienera dla current_Fs_adc
+        % WAŻNE: Filtr FIR powinien być zaprojektowany dla konkretnej Fs_adc.
+        % Jeśli Fs_adc się zmienia, filtr 1/H(f) również powinien się zmienić!
+        % Dla uproszczenia (ale z niedokładnością) na razie używamy tego samego filtru.
+        % W rzeczywistości, dla każdej Fs_adc należałoby ponownie zaprojektować `impulse_response_fir`.
+        
+        % Poniżej, dla poprawnej analizy, MUSISZ przeliczyć filtr dla każdej Fs_adc!
+        % Krok do samodzielnego wykonania:
+        % 1. Dyskretne H(t) dla danej Fs_adc
+        % 2. Dyskretne H(f) dla danej Fs_adc
+        % 3. Projekt filtra 1/H(f) dla danej Fs_adc
+        
+        % Tymczasowo, dla ilustracji, używamy filtra z Fs_adc_selected.
+        % To pokaże, jak ważne jest dopasowanie filtru do Fs_adc.
+        
+        % Aby to zrobić poprawnie, musisz ponownie wykonać kroki 2 i 6 w tej pętli,
+        % dla `current_Fs_adc`.
+
         % PRZYKŁADOWY, POPRAWNY SPOSÓB PRZEPROWADZENIA TEGO KROKU:
         % 1. Zprobkuj H_t dla current_Fs_adc:
         H_t_sampled_for_current_Fs = interp1(t_analog, H_t, 0:(1/current_Fs_adc):T_sim, 'linear', 0);
-                
+        
         % 2. Oblicz H(f) dla tego próbkowania
         H_f_sampled_for_current_Fs = fft(H_t_sampled_for_current_Fs);
-                
+        
         % 3. Zaprojektuj nowy filtr Wienera dla current_Fs_adc
         impulse_response_fir_long_current_Fs = ifft(conj(H_f_sampled_for_current_Fs) ./ (abs(H_f_sampled_for_current_Fs).^2 + regularization_k));
-        impulse_response_fir_current_Fs = fftshift(impulse_response_fir_long_current_Fs); % Przesunięcie zera częstotliwości
-        % Skróć odpowiedź impulsową do długości fir_len
+        impulse_response_fir_current_Fs = fftshift(impulse_response_fir_long_current_Fs);
         impulse_response_fir_current_Fs = real(impulse_response_fir_current_Fs(floor(end/2) - floor(fir_len/2) + 1 : floor(end/2) + ceil(fir_len/2)));
-
+        
         reconstructed_signal_raw = conv(sampled_signal_noisy, impulse_response_fir_current_Fs);
         
-        delay_samples = floor(length(impulse_response_fir_current_Fs) / 2); % Opóźnienie filtra
+        delay_samples = floor(length(impulse_response_fir_current_Fs) / 2);
         reconstructed_signal_aligned = reconstructed_signal_raw(delay_samples + 1 : end - delay_samples);
-        
         if isempty(reconstructed_signal_aligned)
             reconstructed_amplitudes_for_current_fs(event_idx) = 0;
         else
@@ -297,7 +318,6 @@ for Fs_idx = 1:length(Fs_adc_range)
         end
         
     end
-    
     mean_reconstructed_sampling(Fs_idx) = mean(reconstructed_amplitudes_for_current_fs);
     std_reconstructed_sampling(Fs_idx) = std(reconstructed_amplitudes_for_current_fs);
     reconstruction_errors_sampling(Fs_idx) = std(reconstructed_amplitudes_for_current_fs - representative_amplitude);
