@@ -1,6 +1,8 @@
 clear; clc; close all;
 
 %% Parametry impulsu i próbkowania
+A = 1;          % Współczynnik skalujący
+n = 2;          % Wykładnik potęgi
 tau = 1e-6;              % stała czasowa [s]
 Fs = 20e6;               % częstość próbkowania [Hz]
 Ts = 1/Fs;
@@ -9,7 +11,11 @@ t = 0:Ts:tMax;
 Nimp = length(t);
 
 %% Generacja impulsu H(t) (kształtowanie)
-H_t = (t./tau.^2).*exp(-t/tau);   % odpowiedź systemu
+% H_t = (t./tau.^2).*exp(-t/tau);   % odpowiedź systemu
+% Obliczanie wartości funkcji H(t)
+H_t = A * (t ./ tau .^ n) .* exp(-t / tau);
+
+
 H_t = H_t / max(H_t);             % normalizacja do max = 1 (czyli szukana amplituda)
 
 %% Próbkowanie impulsu z losowym przesunięciem fazy
