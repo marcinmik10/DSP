@@ -1,0 +1,7 @@
+git status  //zwraca informacje o lokalnym repozytorium, czy na bieżąca i jakie pliki zostały zmienione
+git add <plik> //dodaje plik do śledzenia przez repozytorium i przez commit
+git add -u //śledzi pliki które już są na repozytorium zdalnym, ale zostały zmienione lokalnie
+git status -uno //wyświetla pliki posiadające lokalne zmiany względem ich stanu na repozytorium
+git commit -m "wiadomość"//zatwierdza dodane zmiany przez git add i doddaje wiadomość w której należy skomentować co zostało zmienione
+git push //wysyła commit na repozytorium zdalne
+git stash // jeśli wystąpi konflikt; przechowuje lokalne zmiany w pamięci ale usuwa je z plików, pozwala na zrobienie git pull, zmiany te potem można przywrócić przez git stash apply, lub usunąć całkowicie przez git stash pop
