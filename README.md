@@ -1,1 +1,8 @@
 Aktualny kod to Projekt_ver2.m. Spróbujmy na nim bazować, trzeba ustalić podstawowe założenia: jaki sygnal podajemy do programu i czego tak naprawdę oczekujemy
+
+
+Model odczytu sygnału z detektora fizyki wysokich energii
+Zadanie jest proste algorytmicznie, ale wymaga sporo dodatkowej wiedzy do samodzielnego przyswojenia - dedykowane dla osób które wolą się "przegryźć" przez literaturę i wyprowadzić parę zależności teoretycznie na kartce, niż tworzyć skomplikowany kod.
+Sygnał z półprzewodnikowego detektora cząstek jonizujących można przybliżyć deltą Kroneckera. Sygnał ten jest następnie wzmacniany i kształtowany przez dedykowaną elektronikę odczytu, dającą w odpowiedzi quazi-gausowski impuls napięciowy, o amplitudzie proporcjonalnej do zdeponowanego w sensorze ładunku. Ta odpowiedź jest próbkowana przez przetwornik analogowo-cyfrowy w losowej fazie (mamy kilka próbek impulsu, ale żadna z nich nie odpowiada maksimum, czyli amplitudzie).
+Zadaniem jest zrekonstruować szukaną amplitudę: ponieważ impuls napięciowy dany jest splotem delty d(t) i funkcji przenoszenia elektroniki odczytu H(t), można zaprojektować filtr cyfrowy i charakterystyce 1/H(t), co w dziedzinie częstotliwości da d(f)*H(f)* 1/H(f) = d(f), czyli, w dziedzinie czasu będzie odpowiadać "odpleceniu" (de-konwolucji) sygnału z sensora.
+Zadanie polega na za-modelowaniu elektroniki odczytu (generacja pseudo-ciągłego sygnału opisanego znaną i daną funkcją analityczną + próbkowanie), wyliczeniu filtru (np. FIR) o charakterystyce 1/H(f), gdzie H(f) to znana i dana postać funkcji przenoszenia, i zbadaniu dokładności rekonstrukcji w funkcji amplitudy impulsu i okresu próbkowania.
