@@ -1,36 +1,34 @@
-% Parametry modelu
-A = 1;         % amplituda
-tau = 1e-6;    % stała czasowa [s]
-n = 1;         % rząd shapera
+A = 1;%amplituda
+tau = 1e-6;%stała czasowa [s]
+n = 1;%rząd shapera
 
-% Oś czasu
 t_max = 10 * tau;
 dt = 1e-8;
 t = 0:dt:t_max;
 
-% --- Odpowiedź impulsowa shapera ---
+%Odpowiedź  
 H = (t/tau).^n .* exp(-t/tau);
 H = H / max(H);
 
 figure; plot(t, H); xlabel('Czas [s]'); ylabel('H(t)'); title('Odpowiedź impulsowa shapera');
 
-% --- Sygnał na wyjściu toru (bez delty i splotu!) ---
+%Sygnał na wyjściu
 Vobs = A * H;
 
-% --- Szum ---
+%Dodanie szumu 
 noise_amp = 0.01;
 Vobs_noisy = Vobs + noise_amp * randn(size(Vobs));
 
 figure; plot(t, Vobs_noisy);
 xlabel('Czas [s]'); ylabel('V_{obs}(t)'); title('Sygnał obserwowany z szumem');
 
-% --- Próbkowanie ADC z losowym offsetem ---
+%Próbkowanie ADC z losowym offsetem 
 fs = 10e6; Ts = 1/fs;
 t0 = rand * Ts;              
 ts = t0:Ts:t_max;
 
-V_samples  = interp1(t, Vobs_noisy, ts, 'pchip', 0);   % próbki zaszumione
-V_samples0 = interp1(t, A*H       , ts, 'pchip', 0);   % próbki „idealne" (do kalibracji)
+V_samples  = interp1(t, Vobs_noisy, ts, 'pchip', 0);% próbki z szumem
+V_samples0 = interp1(t, A*H       , ts, 'pchip', 0);% próbki wzorcowe
 
 figure; plot(t, Vobs_noisy); hold on;
 stem(ts, V_samples, 'r');
@@ -38,53 +36,51 @@ xlabel('Czas [s]'); ylabel('Sygnał');
 title('Próbkowanie z losowym offsetem fazowym');
 legend('V_{obs}(t)', 'V[n]');
 
-% --- Filtr odwrotny projektowany na SIATCE ADC ---
-% h[n] = H(t) przepisane na chwile wielokrotności Ts (bez offsetu t0!)
+%Filtr odwrotny projektowany na SIATCE ADC
 ts0  = 0:Ts:t_max;
 h_adc = interp1(t, H, ts0, 'pchip', 0);
 
-% Długości i FFT
+%Długości i FFT
 N  = numel(V_samples);
 Lh = numel(h_adc);
 M  = 2^nextpow2(N + Lh - 1);
 
 H_d = fft(h_adc, M);
-lambda = 1e-4;                               % regularyzacja (dostosuj do SNR)
-G     = conj(H_d) ./ (abs(H_d).^2 + lambda); % filtr Wiener/Tikhonov
+lambda = 1e-4;%regularyzacja
+G = conj(H_d) ./ (abs(H_d).^2 + lambda);%filtr Wiener/Tikhonov
 
-% Ujednolicenie kształtów wektorów (rzędy)
 V_samples  = V_samples(:).';
 V_samples0 = V_samples0(:).';
 h_adc      = h_adc(:).';
 
-% Długości i FFT
+%Długości i FFT
 N  = numel(V_samples);
 Lh = numel(h_adc);
-M  = 2^nextpow2(N + Lh - 1);      % bezpieczne zero-padding
+M  = 2^nextpow2(N + Lh - 1);%zero-padding
 
 H_d = fft(h_adc, M);
 
-% Filtr odwrotny Wiener/Tikhonov
-lambda = 1e-3;                    % spróbuj 1e-3 .. 1e-2 przy większym szumie
+%Filtr odwrotny Wiener/Tikhonov
+lambda = 1e-3;
 G = conj(H_d) ./ (abs(H_d).^2 + lambda);
 
-% Dekonwolucja przez mnożenie w czestotliwości (z paddingiem)
+%Dekonwolucja przez mnożenie w czestotliwości (z paddingiem)
 Xn = fft([V_samples,  zeros(1, M-N)]);
 X0 = fft([V_samples0, zeros(1, M-N)]);
 
 Y  = Xn .* G;
 Y0 = X0 .* G;
 
-V_rec  = real(ifft(Y));   V_rec  = V_rec(1:N);     % wynik dla danych zaszumionych
-V_rec0 = real(ifft(Y0));  V_rec0 = V_rec0(1:N);    % tor "idealny" do kalibracji
+V_rec  = real(ifft(Y));   V_rec  = V_rec(1:N);%wynik dla danych zaszumionych
+V_rec0 = real(ifft(Y0));  V_rec0 = V_rec0(1:N);%tor "idealny" do kalibracji
 
 [amp_est, k] = max(V_rec);
 if k>1 && k<length(V_rec)
     y1=V_rec(k-1); y2=V_rec(k); y3=V_rec(k+1);
     denom = (y1 - 2*y2 + y3);
     if abs(denom)>eps
-        d = 0.5*(y1 - y3)/denom;                    % przesunięcie sub-próbkowe
-        amp_est = y2 - 0.25*(y1 - y3)*d;            % amplituda w wierzchołku
+        d = 0.5*(y1 - y3)/denom;%przesunięcie sub-próbkowe
+        amp_est = y2 - 0.25*(y1 - y3)*d;%amplituda w wierzchołku
     else
         d = 0;
     end
@@ -96,20 +92,20 @@ t_est = ts(k) + d*Ts;
 fprintf('A=%.3f, A_hat=%.3f, błąd = %.2f %% , t_hat = %.3f us\n', ...
         A, amp_est, 100*(amp_est/A-1), t_est*1e6);
 
-% Kalibracja skali + korekcja baseline'u
+%Kalibracja skali i korekcja baseline'u
 scale = A / max(V_rec0);
 V_rec = scale * V_rec;
-bwin  = max(1, N-20):N;           % kilka ostatnich próbek – baseline
+bwin  = max(1, N-20):N;
 V_rec = V_rec - median(V_rec(bwin));
 
-% Estymacja amplitudy z poprawką paraboliczną + czas
+%Estymacja amplitudy z poprawką paraboliczną
 [amp_est, k] = max(V_rec);
 if k>1 && k<length(V_rec)
     y1=V_rec(k-1); y2=V_rec(k); y3=V_rec(k+1);
     denom = (y1 - 2*y2 + y3);
     if abs(denom)>eps
-        d = 0.5*(y1 - y3)/denom;                 % przesunięcie sub-próbkowe
-        amp_est = y2 - 0.25*(y1 - y3)*d;         % wartość w wierzchołku
+        d = 0.5*(y1 - y3)/denom;
+        amp_est = y2 - 0.25*(y1 - y3)*d;
     else
         d = 0;
     end
@@ -118,13 +114,10 @@ else
 end
 t_est = ts(k) + d*Ts;
 
-% Wykres
 figure; stem(V_rec,'filled');
 xlabel('n'); ylabel('d_{rec}[n]');
 title(sprintf('Dekonwolucja w dziedzinie częstotliwości (Wiener), \\lambda=%.1e', lambda));
-
 fprintf('Oszacowana amplituda: %.4f (A=%.4f), t_est=%.3f us\n', amp_est, A, t_est*1e6);
-
 figure;
 f = (0:M-1)/M * fs;
 semilogx(f, 20*log10(abs(H_d)+1e-12), 'LineWidth',1.2); hold on;
