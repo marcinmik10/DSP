@@ -1,6 +1,9 @@
-A = 1;%amplituda
-tau = 1e-6;%stała czasowa [s]
-n = 1;%rząd shapera
+clc; clear;
+close all;
+rng(0);
+A = 1; %amplituda
+tau = 1e-6; %stała czasowa [s]
+n = 1; %rząd shapera
 
 t_max = 10 * tau;
 dt = 1e-8;
@@ -27,8 +30,8 @@ fs = 10e6; Ts = 1/fs;
 t0 = rand * Ts;              
 ts = t0:Ts:t_max;
 
-V_samples  = interp1(t, Vobs_noisy, ts, 'pchip', 0);% próbki z szumem
-V_samples0 = interp1(t, A*H       , ts, 'pchip', 0);% próbki wzorcowe
+V_samples  = interp1(t, Vobs_noisy, ts, 'pchip', 0); % próbki z szumem
+V_samples0 = interp1(t, A*H       , ts, 'pchip', 0); % próbki wzorcowe
 
 figure; plot(t, Vobs_noisy); hold on;
 stem(ts, V_samples, 'r');
@@ -47,7 +50,7 @@ M  = 2^nextpow2(N + Lh - 1);
 
 H_d = fft(h_adc, M);
 lambda = 1e-4;%regularyzacja
-G = conj(H_d) ./ (abs(H_d).^2 + lambda);%filtr Wiener/Tikhonov
+G = conj(H_d) ./ (abs(H_d).^2 + lambda); %filtr Wiener/Tikhonov
 
 V_samples  = V_samples(:).';
 V_samples0 = V_samples0(:).';
@@ -56,7 +59,7 @@ h_adc      = h_adc(:).';
 %Długości i FFT
 N  = numel(V_samples);
 Lh = numel(h_adc);
-M  = 2^nextpow2(N + Lh - 1);%zero-padding
+M  = 2^nextpow2(N + Lh - 1); %zero-padding
 
 H_d = fft(h_adc, M);
 
@@ -71,16 +74,16 @@ X0 = fft([V_samples0, zeros(1, M-N)]);
 Y  = Xn .* G;
 Y0 = X0 .* G;
 
-V_rec  = real(ifft(Y));   V_rec  = V_rec(1:N);%wynik dla danych zaszumionych
-V_rec0 = real(ifft(Y0));  V_rec0 = V_rec0(1:N);%tor "idealny" do kalibracji
+V_rec  = real(ifft(Y));   V_rec  = V_rec(1:N); %wynik dla danych zaszumionych
+V_rec0 = real(ifft(Y0));  V_rec0 = V_rec0(1:N); %tor "idealny" do kalibracji
 
 [amp_est, k] = max(V_rec);
 if k>1 && k<length(V_rec)
     y1=V_rec(k-1); y2=V_rec(k); y3=V_rec(k+1);
     denom = (y1 - 2*y2 + y3);
     if abs(denom)>eps
-        d = 0.5*(y1 - y3)/denom;%przesunięcie sub-próbkowe
-        amp_est = y2 - 0.25*(y1 - y3)*d;%amplituda w wierzchołku
+        d = 0.5*(y1 - y3)/denom; %przesunięcie sub-próbkowe
+        amp_est = y2 - 0.25*(y1 - y3)*d; %amplituda w wierzchołku
     else
         d = 0;
     end
